@@ -1,6 +1,8 @@
 var numeric = require("numeric"),
     firstKey = require("firstkey"),
-    generate = require("triangle-homography");
+    generate = require("triangle-homography"),
+    Emitter = require('events').EventEmitter,
+    util = require("util");
 
 module.exports = createBuffer;
 
@@ -44,7 +46,7 @@ function TriangleBuffer(container, viewport) {
     triangle.style.borderRight = "256px solid transparent";
     triangle.style[transformOriginKey] = "0 0 0";
 
-    // Should not be modified manually
+    // Should not be modified manuall
     this._buffer = [];
     this._bufferIndex = 0;
     this._color = "#ffffff";
@@ -56,7 +58,11 @@ function TriangleBuffer(container, viewport) {
     this._transformOriginKey = transformOriginKey;
     this._triangle = triangle;
     this._viewport = viewport;
+
+    Emitter.call(this)
 }
+
+util.inherits(TriangleBuffer, Emitter)
 
 TriangleBuffer.prototype.begin = beginDraw;
 TriangleBuffer.prototype.drawTriangle = createTriangle;
@@ -239,6 +245,8 @@ function endDraw() {
             m[1][3].toFixed(5) + "," +
             m[2][3].toFixed(5) +
             ",1)";
+
+        this.emit('shade', i, m, newTriangle);
     }
 
     for (i = this._bufferIndex; i < bufferLength; i += 1) {

@@ -19,7 +19,7 @@
   "dependencies": {
     "global": "~2.0.7",
     "css-viewport": "~0.2.0",
-    "triangle-buffer": "~0.1.6",
+    "triangle-buffer": "~0.1.7",
     "radial-camera": "~0.1.0",
     "request-animation-frame": "~0.1.1"
   },

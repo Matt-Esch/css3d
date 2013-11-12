@@ -41,6 +41,22 @@ triangleBuffer.on("shade", function () {
     }
 })
 
+
+var catDiv = document.createElement("div")
+catDiv.className = "model-button"
+catDiv.style.height ="60px"
+document.body.appendChild(catDiv)
+var catViewport = new Viewport(Math.PI/2)
+var catBuffer = createBuffer(catDiv, catViewport)
+catViewport.update(catDiv)
+catBuffer.on("shade", function () {
+    var shader = shaders[0]
+    if (shader) {
+        shader.apply(null, arguments)
+    }
+})
+
+
 var now = Date.now()
 var then
 var delta = 0
@@ -57,10 +73,19 @@ var camera = createCamera({
     now = Date.now()
     delta = then ? (now - then) / 1000 : 0
 
-    triangleBuffer.loadMatrix(camera(delta))
-    triangleBuffer.color("rgb(0,50,90)")
+    var cameraMatrix = camera(delta)
+    cameraMatrix[1][3] = 20
+
+    triangleBuffer.loadMatrix(cameraMatrix)
     triangleBuffer.begin()
     models[modelIndex](triangleBuffer)
     triangleBuffer.end()
+
+    // Render cat on the menu
+    catBuffer.loadMatrix(cameraMatrix)
+    catBuffer.begin()
+    models[0](catBuffer)
+    catBuffer.end()
+
     then = now
 })()

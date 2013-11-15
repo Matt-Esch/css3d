@@ -8,9 +8,11 @@ var Viewport = require("css-viewport")
 
 
 var createCamera = require("./lib/camera.js")
+var createSpin = require("./lib/spin-camera.js")
 var triangleModel = require("./lib/triangle-model.js")
 var catModel = require("./models/cat.json")
 var catShader = require("./models/cat.shader.js")
+var tankModel = require("./models/tank.json")
 var teapotModel = require("./models/teapot.json")
 
 var viewport = new Viewport(Math.PI/2)
@@ -19,6 +21,7 @@ var triangleBuffer = createBuffer(document.body, viewport)
 
 var models = [
     triangleModel(triangleBuffer, catModel),
+    triangleModel(triangleBuffer, tankModel),
     triangleModel(triangleBuffer, teapotModel)
 ]
 
@@ -36,21 +39,48 @@ function updatePerspective() {
 
 triangleBuffer.backfaceVisible(false)
 triangleBuffer.on("shade", function () {
-    var shader = shaders[modelIndex]
+    var shader = shaders[0]
     if (shader) {
         shader.apply(null, arguments)
     }
 })
 
 
+// Cat icon
 var catDiv = document.createElement("div")
 catDiv.className = "model-button"
 catDiv.style.height ="60px"
 document.body.appendChild(catDiv)
 var catViewport = new Viewport(Math.PI/2)
 var catBuffer = createBuffer(catDiv, catViewport)
+var catCamera = createSpin({
+    y: 20,
+    radius: 140,
+    angleY: Math.PI,
+    angleX: Math.PI / 4
+}, -3)
 catViewport.update(catDiv)
 catBuffer.on("shade", function () {
+    var shader = shaders[0]
+    if (shader) {
+        shader.apply(null, arguments)
+    }
+})
+
+var tankDiv = document.createElement("div")
+tankDiv.className = "model-button"
+tankDiv.style.height ="60px"
+tankDiv.style.left = "75px"
+document.body.appendChild(tankDiv)
+var tankViewport = new Viewport(Math.PI/2)
+var tankBuffer = createBuffer(tankDiv, tankViewport)
+var tankCamera = createSpin({
+    radius: 80,
+    angleY: Math.PI,
+    angleX: Math.PI / 4
+}, -3)
+tankViewport.update(tankDiv)
+tankBuffer.on("shade", function () {
     var shader = shaders[0]
     if (shader) {
         shader.apply(null, arguments)
@@ -63,6 +93,8 @@ var then
 var delta = 0
 var modelIndex = 0;
 var camera = createCamera({
+    x: 0,
+    y: 20,
     radius: 140,
     angleY: Math.PI,
     angleX: Math.PI / 4
@@ -74,24 +106,27 @@ var camera = createCamera({
     now = Date.now()
     delta = then ? (now - then) / 1000 : 0
 
-    var cameraMatrix = camera(delta)
-    cameraMatrix[1][3] = 20
-
-    triangleBuffer.loadMatrix(cameraMatrix)
+    triangleBuffer.loadMatrix(camera(delta))
     triangleBuffer.begin()
     models[modelIndex](triangleBuffer)
     triangleBuffer.end()
 
     // Render cat on the menu
-    catBuffer.loadMatrix(cameraMatrix)
+    catBuffer.loadMatrix(catCamera(delta))
     catBuffer.begin()
     models[0](catBuffer)
     catBuffer.end()
 
+    // Render tank on the menu
+    tankBuffer.loadMatrix(tankCamera(delta))
+    tankBuffer.begin()
+    models[1](tankBuffer)
+    tankBuffer.end()
+
     then = now
 })()
 
-},{"./lib/camera.js":2,"./lib/triangle-model.js":3,"./models/cat.json":4,"./models/cat.shader.js":5,"./models/teapot.json":6,"css-viewport":7,"global/document":9,"global/window":10,"request-animation-frame":14,"triangle-buffer":15}],2:[function(require,module,exports){
+},{"./lib/camera.js":2,"./lib/spin-camera.js":3,"./lib/triangle-model.js":4,"./models/cat.json":5,"./models/cat.shader.js":6,"./models/tank.json":7,"./models/teapot.json":8,"css-viewport":9,"global/document":11,"global/window":12,"request-animation-frame":16,"triangle-buffer":17}],2:[function(require,module,exports){
 var window = require("global/window")
 var RadialCamera = require("radial-camera")
 
@@ -160,7 +195,28 @@ function createCamera(initial) {
     }
 }
 
-},{"global/window":10,"radial-camera":11}],3:[function(require,module,exports){
+},{"global/window":12,"radial-camera":13}],3:[function(require,module,exports){
+var RadialCamera = require("radial-camera")
+
+var TWOPI = Math.PI * 2
+
+module.exports = spinCamera
+
+
+function spinCamera(initial, speed) {
+    var camera = new RadialCamera(initial)
+
+    return nextMatrix
+
+    function nextMatrix(delta) {
+        camera.angleY += speed * delta
+        camera.angleY %= TWOPI
+        camera.computeTransform()
+        return camera.transform
+    }
+}
+
+},{"radial-camera":13}],4:[function(require,module,exports){
 module.exports = triangleModel
 
 function triangleModel(buffer, model) {
@@ -178,15 +234,19 @@ function triangleMatrices(buffer, model) {
     var vertices = model.vertices
     var matrices = new Array(triangles.length)
 
-    var t, verts, matrix
+    var t, verts, matrix,
+        tLen = triangles.length,
+        vLen = vertices.length
 
-    for (var i = 0; i < triangles.length; i++) {
+    for (var i = 0; i < tLen; i++) {
         verts = triangles[i]
         t = []
 
-        t.push(vertices[verts[0]-1].slice(0))
-        t.push(vertices[verts[1]-1].slice(0))
-        t.push(vertices[verts[2]-1].slice(0))
+        var v0 = verts[0], v1 = verts[1], v2 = verts[2]
+
+        t.push(vertices[v0 > 0 ? v0 - 1 : vLen + v0].slice(0))
+        t.push(vertices[v1 > 0 ? v1 - 1 : vLen + v1].slice(0))
+        t.push(vertices[v2 > 0 ? v2 - 1 : vLen + v2].slice(0))
 
         matrix = matrices[i] = buffer.triangleMatrix(t)
         matrix.normal = buffer.matrixNormal(matrix)
@@ -194,7 +254,7 @@ function triangleMatrices(buffer, model) {
 
     return matrices
 }
-},{}],4:[function(require,module,exports){
+},{}],5:[function(require,module,exports){
 module.exports={
     "vertices": [
         [-0.024730, 39.245174, -9.432783],
@@ -395,14 +455,139 @@ module.exports={
     ]
 }
 
-},{}],5:[function(require,module,exports){
+},{}],6:[function(require,module,exports){
 module.exports = catShader
 
 function catShader(i, matrix, triangle) {
     triangle.style.borderTopColor = 'rgb(' +  2 * Math.round(i) + ',' + 2 * Math.round(i/2) + ',' + 2 * Math.round(i/5) + ')';
 }
 
-},{}],6:[function(require,module,exports){
+},{}],7:[function(require,module,exports){
+module.exports={
+    "vertices": [
+        [9.950608, 3.401395, 13.179185],
+        [9.950608, 5.467624, 12.507827],
+        [9.950609, 6.744625, 10.750188],
+        [9.95061, 6.744628, -14.216638],
+        [9.950611, 5.467629, -15.974277],
+        [9.950611, 3.4014, -16.645636],
+        [9.950611, 1.335171, -15.974277],
+        [9.95061, 0.058171, -14.216638],
+        [9.950609, 0.058167, 10.750187],
+        [9.950608, 1.335167, 12.507824],
+        [-10.16805, 3.401394, 13.179182],
+        [-10.16805, 5.467623, 12.507822],
+        [-10.168051, 6.744623, 10.750183],
+        [-10.168049, 6.744627, -14.21664],
+        [-10.168048, 5.467628, -15.97428],
+        [-10.168047, 3.401399, -16.645639],
+        [-10.168047, 1.33517, -15.97428],
+        [-10.168048, 0.05817, -14.216641],
+        [-10.168051, 0.058166, 10.750184],
+        [-10.168051, 1.335166, 12.507823],
+        [-6.618286, 3.999418, 14.536545],
+        [6.602452, 3.999418, 14.536545],
+        [6.612121, 3.999418, -19.076134],
+        [-10.00792, 7.446903, 10.937015],
+        [9.992084, 7.446903, 10.937014],
+        [-10.004471, 7.446903, -14.590511],
+        [9.995533, 7.446903, -14.590512],
+        [9.994708, 7.446903, -8.486501],
+        [-10.005297, 7.446903, -8.486502],
+        [9.992855, 7.446903, 5.229805],
+        [-10.007148, 7.446903, 5.229804],
+        [-6.606328, 3.999418, -19.076134],
+        [-6.606328, 3.999418, 14.536545],
+        [-6.60633, 9.963738, 10.937017],
+        [-6.606329, 9.963738, -14.59051],
+        [-6.606329, 9.963737, -8.486501],
+        [-6.60633, 9.963738, 5.229805],
+        [6.61212, 9.963737, -14.590511],
+        [6.612121, 4.012164, 14.526278],
+        [6.61212, 9.963737, -8.4865],
+        [6.61212, 9.963738, 5.229806],
+        [6.61212, 9.963738, 10.937017],
+        [-5.490258, 11.963737, -5.804017],
+        [-5.490259, 11.963737, 2.547314],
+        [5.496048, 11.963737, 2.547314],
+        [5.496048, 11.963737, -5.804017]
+    ],
+    "triangles": [
+        [-46, -45, -35],
+        [-35, -36, -46],
+        [-45, -44, -34],
+        [-34, -35, -45],
+        [-44, -43, -33],
+        [-33, -34, -44],
+        [-43, -42, -32],
+        [-32, -33, -43],
+        [-42, -41, -31],
+        [-31, -32, -42],
+        [-41, -40, -30],
+        [-30, -31, -41],
+        [-40, -39, -29],
+        [-29, -30, -40],
+        [-39, -38, -28],
+        [-28, -29, -39],
+        [-38, -37, -27],
+        [-27, -28, -38],
+        [-37, -46, -36],
+        [-36, -27, -37],
+        [-38, -39, -40],
+        [-40, -41, -42],
+        [-42, -43, -44],
+        [-44, -45, -46],
+        [-42, -44, -46],
+        [-40, -42, -46],
+        [-38, -40, -46],
+        [-37, -38, -46],
+        [-35, -34, -33],
+        [-33, -32, -31],
+        [-31, -30, -29],
+        [-29, -28, -27],
+        [-31, -29, -27],
+        [-33, -31, -27],
+        [-35, -33, -27],
+        [-36, -35, -27],
+        [-13, -10, -16],
+        [-16, -23, -13],
+        [-26, -14, -13],
+        [-13, -23, -26],
+        [-24, -9, -20],
+        [-20, -9, -7],
+        [-7, -19, -20],
+        [-19, -7, -6],
+        [-6, -17, -19],
+        [-5, -6, -10],
+        [-10, -13, -5],
+        [-8, -5, -13],
+        [-25, -8, -13],
+        [-14, -25, -13],
+        [-15, -21, -12],
+        [-21, -18, -11],
+        [-11, -12, -21],
+        [-18, -16, -10],
+        [-10, -11, -18],
+        [-15, -12, -9],
+        [-9, -24, -15],
+        [-12, -11, -7],
+        [-7, -9, -12],
+        [-4, -3, -2],
+        [-2, -1, -4],
+        [-22, -17, -6],
+        [-6, -5, -22],
+        [-8, -22, -5],
+        [-11, -10, -3],
+        [-3, -4, -11],
+        [-10, -6, -2],
+        [-2, -3, -10],
+        [-6, -7, -1],
+        [-1, -2, -6],
+        [-7, -11, -4],
+        [-4, -1, -7],
+    ]
+}
+},{}],8:[function(require,module,exports){
 module.exports={
     "vertices": [
         [5.929688, 4.125000, 0.000000],
@@ -1931,7 +2116,7 @@ module.exports={
         [470, 530, 529]
     ]
 }
-},{}],7:[function(require,module,exports){
+},{}],9:[function(require,module,exports){
 module.exports = Viewport;
 
 var firstKey = require('firstkey');
@@ -1970,7 +2155,7 @@ var firstKey = require('firstkey');
 
     Viewport.prototype.perspectiveKey = perspective;
     Viewport.prototype.update = update;
-},{"firstkey":8}],8:[function(require,module,exports){
+},{"firstkey":10}],10:[function(require,module,exports){
 module.exports = firstKey
 
 function firstKey(object) {
@@ -1989,14 +2174,14 @@ function firstKey(object) {
     return null;
 }
 
-},{}],9:[function(require,module,exports){
+},{}],11:[function(require,module,exports){
 if (typeof document !== "undefined") {
     module.exports = document
 } else {
     module.exports = require("min-document")
 }
 
-},{"min-document":22}],10:[function(require,module,exports){
+},{"min-document":24}],12:[function(require,module,exports){
 var global=typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {};if (typeof window !== "undefined") {
     module.exports = window
 } else if (typeof global !== "undefined") {
@@ -2005,7 +2190,7 @@ var global=typeof self !== "undefined" ? self : typeof window !== "undefined" ? 
     module.exports = {}
 }
 
-},{}],11:[function(require,module,exports){
+},{}],13:[function(require,module,exports){
 var numeric = require('numeric');
 
 module.exports = RadialCamera;
@@ -2105,7 +2290,7 @@ function computeTransform() {
 
     return this.transform;
 }
-},{"numeric":12}],12:[function(require,module,exports){
+},{"numeric":14}],14:[function(require,module,exports){
 var global=typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {};"use strict";
 
 var numeric = (typeof exports === "undefined")?(function numeric() {}):(exports);
@@ -6531,7 +6716,7 @@ numeric.svd= function svd(A) {
 };
 
 
-},{}],13:[function(require,module,exports){
+},{}],15:[function(require,module,exports){
 (function() {
   var max, now, _ref, _ref2;
 
@@ -6579,11 +6764,11 @@ numeric.svd= function svd(A) {
 
 }).call(this);
 
-},{}],14:[function(require,module,exports){
+},{}],16:[function(require,module,exports){
 
 module.exports = require('./lib/shim')
 
-},{"./lib/shim":13}],15:[function(require,module,exports){
+},{"./lib/shim":15}],17:[function(require,module,exports){
 var numeric = require("numeric"),
     firstKey = require("firstkey"),
     generate = require("triangle-homography"),
@@ -6839,11 +7024,11 @@ function endDraw() {
         buffer[i].style.display = "none";
     }
 }
-},{"events":20,"firstkey":16,"numeric":17,"triangle-homography":18,"util":21}],16:[function(require,module,exports){
-module.exports=require(8)
-},{}],17:[function(require,module,exports){
-module.exports=require(12)
-},{}],18:[function(require,module,exports){
+},{"events":22,"firstkey":18,"numeric":19,"triangle-homography":20,"util":23}],18:[function(require,module,exports){
+module.exports=require(10)
+},{}],19:[function(require,module,exports){
+module.exports=require(14)
+},{}],20:[function(require,module,exports){
 module.exports = createMatrixGenerator;
 
 var system = [
@@ -6947,7 +7132,7 @@ function createMatrixGenerator(t) {
 
     return bindSVD(svd.U, svd.S, svd.V);
 }
-},{"numeric":17}],19:[function(require,module,exports){
+},{"numeric":19}],21:[function(require,module,exports){
 
 
 //
@@ -7165,7 +7350,7 @@ if (typeof Object.getOwnPropertyDescriptor === 'function') {
   exports.getOwnPropertyDescriptor = valueObject;
 }
 
-},{}],20:[function(require,module,exports){
+},{}],22:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -7446,7 +7631,7 @@ EventEmitter.listenerCount = function(emitter, type) {
     ret = emitter._events[type].length;
   return ret;
 };
-},{"util":21}],21:[function(require,module,exports){
+},{"util":23}],23:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -7991,7 +8176,7 @@ function hasOwnProperty(obj, prop) {
   return Object.prototype.hasOwnProperty.call(obj, prop);
 }
 
-},{"_shims":19}],22:[function(require,module,exports){
+},{"_shims":21}],24:[function(require,module,exports){
 
 },{}]},{},[1])
 ;
